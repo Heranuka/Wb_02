@@ -6,9 +6,6 @@ import (
 	"strings"
 )
 
-// findAnagrams принимает срез слов и возвращает map,
-// где ключ — первое встретившееся слово множества анаграмм,
-// значение — срез всех анаграмм (включая ключ), отсортированных.
 func findAnagrams(words []string) map[string][]string {
 	groups := make(map[string][]string)
 
@@ -22,18 +19,17 @@ func findAnagrams(words []string) map[string][]string {
 	result := make(map[string][]string)
 	for _, group := range groups {
 		if len(group) < 2 {
-			continue // пропускаем одиночки
+			continue
 		}
 
 		sort.Strings(group)
-		keyWord := group[0] // ключ — первое слово по алфавиту среди анаграмм
+		keyWord := group[0]
 		result[keyWord] = group
 	}
 
 	return result
 }
 
-// sortedRunes возвращает строку с буквами исходной, отсортированными по возрастанию
 func sortedRunes(s string) string {
 	r := []rune(s)
 	sort.Slice(r, func(i, j int) bool { return r[i] < r[j] })
