@@ -55,7 +55,7 @@ func TestFindAnagrams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := findAnagrams(tt.in)
 
-			// Проверяем совпадение ключей
+	
 			if len(got) != len(tt.want) {
 				t.Fatalf("expected %d groups, got %d", len(tt.want), len(got))
 			}
