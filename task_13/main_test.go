@@ -147,7 +147,7 @@ func TestSeparatedOnlyNoDelimiter(t *testing.T) {
 
 func TestEmptyField(t *testing.T) {
 	input := "a\t\tc\n"
-	expected := "\tc\n" // Исправлено: пустое поле - пустая строка, поэтому одна табуляция перед "c"
+	expected := "\tc\n"
 
 	out, err := runCut([]string{"-f", "2-3"}, input)
 
@@ -164,7 +164,7 @@ func TestSeparatedOnly(t *testing.T) {
 		"a\tb\tc\n" +
 		"d\n" +
 		"e\tf\n"
-	expected := "a\tb\ne\tf\n" // исправлено ожидаемое значение
+	expected := "a\tb\ne\tf\n"
 
 	out, err := runCut([]string{"-f", "1-2", "-s"}, input)
 	if err != nil {
