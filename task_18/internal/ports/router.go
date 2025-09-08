@@ -9,7 +9,8 @@ import (
 	"test_18/internal/config"
 	"test_18/internal/ports/rest"
 	"test_18/internal/service"
-	"test_18/pkg/e.go"
+	"test_18/pkg/e"
+
 	"time"
 
 	"github.com/gin-gonic/gin"

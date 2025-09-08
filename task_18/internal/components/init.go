@@ -8,7 +8,8 @@ import (
 	"test_18/internal/ports"
 	"test_18/internal/service"
 	"test_18/internal/storage/pg"
-	"test_18/pkg/e.go"
+
+	"test_18/pkg/e"
 	"test_18/pkg/logger"
 )
 
@@ -50,10 +51,10 @@ func (c *Components) ShutDownComponents() error {
 	return nil
 }
 
-func SetupLogger(cfg config.Config) *slog.Logger {
-	log := &slog.Logger{}
+func SetupLogger(cfg string) *slog.Logger {
+	var log *slog.Logger
 
-	switch cfg.Env {
+	switch envLocal {
 	case envLocal:
 		log = logger.SetupPrettySlog()
 	case envDev:

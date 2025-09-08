@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"test_18/internal/domain"
-	"test_18/pkg/e.go"
 	"time"
 )
 
@@ -12,7 +11,10 @@ type DB interface {
 	CreateEvent(ctx context.Context, event domain.Event) (int, error)
 	UpdateEvent(ctx context.Context, id int, req domain.UpdateEventRequest) error
 	DeleteEvent(ctx context.Context, id int) error
-	GetEventsForTime(ctx context.Context, startDate time.Time, endDate time.Time) ([]domain.Event, error)
+	GetEventsForDay(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	GetEventsForWeek(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	GetEventsForMonth(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	CreateUser(ctx context.Context) (int, error)
 }
 
 type Service struct {
@@ -36,11 +38,16 @@ func (s *Service) UpdateEvent(ctx context.Context, id int, req domain.UpdateEven
 func (s *Service) DeleteEvent(ctx context.Context, id int) error {
 	return s.db.DeleteEvent(ctx, id)
 }
-func (s *Service) GetEventsForTime(ctx context.Context, startDate time.Time, endDate time.Time) ([]domain.Event, error) {
-	events, err := s.db.GetEventsForTime(ctx, startDate, endDate)
-	if err != nil {
-		return nil, e.Wrap("service.GetEventsForTime", err)
-	}
-	s.logger.Error(" GetEventsForDay", slog.Any("events", events))
-	return events, nil
+func (s *Service) GetEventsForDay(ctx context.Context, userID int, date time.Time) ([]domain.Event, error) {
+	return s.db.GetEventsForDay(ctx, userID, date)
+}
+func (s *Service) GetEventsForWeek(ctx context.Context, userID int, date time.Time) ([]domain.Event, error) {
+	return s.db.GetEventsForWeek(ctx, userID, date)
+}
+func (s *Service) GetEventsForMonth(ctx context.Context, userID int, date time.Time) ([]domain.Event, error) {
+	return s.db.GetEventsForMonth(ctx, userID, date)
+}
+
+func (s *Service) CreateUser(ctx context.Context) (int, error) {
+	return s.db.CreateUser(ctx)
 }

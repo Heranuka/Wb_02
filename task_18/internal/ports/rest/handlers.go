@@ -11,11 +11,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+//go:generate mockgen -source=handlers.go -destination=mocks/mock.go
 type EventHandler interface {
 	CreateEvent(ctx context.Context, event domain.Event) (int, error)
 	UpdateEvent(ctx context.Context, id int, req domain.UpdateEventRequest) error
 	DeleteEvent(ctx context.Context, id int) error
-	GetEventsForTime(ctx context.Context, startDate time.Time, endDate time.Time) ([]domain.Event, error)
+	GetEventsForDay(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	GetEventsForWeek(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	GetEventsForMonth(ctx context.Context, userID int, date time.Time) ([]domain.Event, error)
+	CreateUser(ctx context.Context) (int, error)
 }
 
 type Handler struct {
@@ -29,6 +33,7 @@ func NewHandler(logger *slog.Logger, eventHandler EventHandler) *Handler {
 		eventHandler: eventHandler,
 	}
 }
+
 func (h *Handler) CreateEventHandler(c *gin.Context) {
 	var req domain.Request
 
@@ -38,24 +43,31 @@ func (h *Handler) CreateEventHandler(c *gin.Context) {
 		return
 	}
 
-	var event = domain.Event{
-		Title:       req.Title,
-		Description: req.Description,
-		StartTime:   time.Now(),
-		EndTime:     time.Now(),
-		Location:    req.Location,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	id, err := h.eventHandler.CreateEvent(c.Request.Context(), event)
+	userID, err := h.eventHandler.CreateUser(c.Request.Context())
 	if err != nil {
-		h.logger.Error("Failed to CreateEvent", slog.String("error", err.Error()), slog.Int("id", id))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.logger.Error("Failed to create user", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"response": id})
+	event := domain.Event{
+		UserID:      userID,
+		Title:       req.Title,
+		Description: req.Description,
+		EventDate:   domain.Date(time.Time(req.EventDate).In(time.UTC)),
+		CreatedAt:   domain.Date(time.Now().UTC()),
+		UpdatedAt:   domain.Date(time.Now().UTC()),
+	}
+
+	eventID, err := h.eventHandler.CreateEvent(c.Request.Context(), event)
+	if err != nil {
+		h.logger.Error("Failed to CreateEvent", slog.String("error", err.Error()), slog.Int("user_id", userID))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	event.ID = eventID
+
+	c.JSON(http.StatusOK, gin.H{"result": event})
 }
 
 func (h *Handler) UpdateEventHandler(c *gin.Context) {
@@ -101,60 +113,89 @@ func (h *Handler) DeleteEventHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"successfully deleted": id})
 }
 
+func parseUserIDAndDate(c *gin.Context) (int, time.Time, error) {
+	dateParam := c.Query("date")
+	if dateParam == "" {
+		dateParam = time.Now().UTC().Format("2006-01-02")
+	}
+
+	idstr := c.Query("user_id")
+	id, err := strconv.Atoi(idstr)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+
+	date, err := time.Parse("2006-01-02", dateParam)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	date = date.UTC()
+
+	return id, date, nil
+}
+
 func (h *Handler) GetEventsForDayHandler(c *gin.Context) {
-	// Получаем текущую дату и время в UTC
-	now := time.Now().UTC()
+	id, date, err := parseUserIDAndDate(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-	// Обрезаем время, чтобы получить только дату
-	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-
-	// Вычисляем дату следующего дня
-	nextDay := date.AddDate(0, 0, 1)
-
-	events, err := h.eventHandler.GetEventsForTime(c.Request.Context(), date, nextDay)
-	h.logger.Error(" GetEventsForDay", slog.Any("events", events))
-
+	events, err := h.eventHandler.GetEventsForDay(c.Request.Context(), id, date)
 	if err != nil {
 		h.logger.Error("Failed to GetEventsForDay", slog.String("error", err.Error()))
-		statusCode := http.StatusInternalServerError // Default status
-		if err.Error() == "not found" {              // Adjust based on your error types
+		statusCode := http.StatusInternalServerError
+		if err.Error() == "not found" {
 			statusCode = http.StatusNotFound
 		}
 		c.JSON(statusCode, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"events for day": events})
+	h.logger.Info("GetEventsForDay success", slog.Any("events", events))
+	c.JSON(http.StatusOK, gin.H{"events_for_day": events})
 }
 
 func (h *Handler) GetEventsForWeekHandler(c *gin.Context) {
-	now := time.Now()
-
-	// Обрезаем время, чтобы получить только дату
-	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	nextDay := date.AddDate(0, 0, 7)
-	events, err := h.eventHandler.GetEventsForTime(c.Request.Context(), date, nextDay)
+	id, date, err := parseUserIDAndDate(c)
 	if err != nil {
-		h.logger.Error("Failed toGetEventsForWeek", slog.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"events for week": events})
+
+	events, err := h.eventHandler.GetEventsForWeek(c.Request.Context(), id, date)
+	if err != nil {
+		h.logger.Error("Failed to GetEventsForWeek", slog.String("error", err.Error()))
+		statusCode := http.StatusInternalServerError
+		if err.Error() == "not found" {
+			statusCode = http.StatusNotFound
+		}
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.Info("GetEventsForWeek success", slog.Any("events", events))
+	c.JSON(http.StatusOK, gin.H{"events_for_week": events})
 }
 
 func (h *Handler) GetEventsForMonthHandler(c *gin.Context) {
-	now := time.Now()
-
-	// Обрезаем время, чтобы получить только дату
-	date := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-
-	nextDay := date.AddDate(0, 0, 31)
-	events, err := h.eventHandler.GetEventsForTime(c.Request.Context(), date, nextDay)
+	id, date, err := parseUserIDAndDate(c)
 	if err != nil {
-		h.logger.Error("Failed toGetEventsForMonth", slog.String("error", err.Error()))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"events for month": events})
+	events, err := h.eventHandler.GetEventsForMonth(c.Request.Context(), id, date)
+	if err != nil {
+		h.logger.Error("Failed to GetEventsForMonth", slog.String("error", err.Error()))
+		statusCode := http.StatusInternalServerError
+		if err.Error() == "not found" {
+			statusCode = http.StatusNotFound
+		}
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.Info("GetEventsForMonth success", slog.Any("events", events))
+	c.JSON(http.StatusOK, gin.H{"events_for_month": events})
 }

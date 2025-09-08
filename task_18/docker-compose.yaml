@@ -3,6 +3,9 @@ services:
   app:
     container_name: app
     image: eventservice
+    depends_on:
+      - pg-local
+      - migrate
     ports:
       - "8080:8080"
     networks:
@@ -33,8 +36,8 @@ services:
     image: migrate/migrate:v4.15.2
     container_name: migration
     depends_on:
-      - pg-local
-      - App
+      pg-local:
+        condition: service_healthy
     command: [
       "-path=/app/migrations", # <---  Путь внутри контейнера
       "-database=postgres://postgres:1@pg-local:5432/postgres?sslmode=disable",
